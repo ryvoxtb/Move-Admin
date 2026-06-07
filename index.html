@@ -1,0 +1,814 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RYVOX MOVIS – Admin Panel</title>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Outfit:wght@300;400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css">
+</head>
+<body>
+
+<!-- ==============================
+     SECURITY: SOURCE CODE PROTECT
+     ============================== -->
+<script>
+(function(){
+    document.addEventListener('contextmenu', function(e){ e.preventDefault(); return false; });
+    document.addEventListener('keydown', function(e){
+        if(e.keyCode===123) { e.preventDefault(); return false; }
+        if(e.ctrlKey && e.shiftKey && (e.keyCode===73||e.keyCode===74||e.keyCode===67)) { e.preventDefault(); return false; }
+        if(e.ctrlKey && e.keyCode===85) { e.preventDefault(); return false; }
+        if(e.ctrlKey && e.keyCode===83) { e.preventDefault(); return false; }
+    });
+    (function devBlock(){
+        const threshold=160;
+        setInterval(function(){
+            if(window.outerWidth-window.innerWidth>threshold||window.outerHeight-window.innerHeight>threshold){
+                document.body.innerHTML='<div style="display:flex;align-items:center;justify-content:center;height:100vh;background:#060608;color:#ff2d2d;font-family:monospace;font-size:1.5rem;">⛔ Developer tools are disabled.</div>';
+            }
+        },1000);
+    })();
+})();
+</script>
+
+<!-- ==============================
+     ADMIN LOGIN GATE
+     ============================== -->
+<div id="loginOverlay" style="
+    position:fixed;inset:0;z-index:9999;
+    background:#060608;
+    display:flex;align-items:center;justify-content:center;
+    font-family:'Outfit',sans-serif;
+">
+    <div style="
+        background:rgba(14,14,20,0.97);border:1px solid rgba(255,255,255,0.09);
+        border-radius:24px;padding:40px 48px;width:100%;max-width:420px;
+        box-shadow:0 30px 80px rgba(0,0,0,0.9);text-align:center;
+    ">
+        <div style="font-family:'Bebas Neue',sans-serif;font-size:2rem;letter-spacing:3px;
+            background:linear-gradient(90deg,#fff,#fbbf24,#ff6b35);
+            -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+            margin-bottom:8px;">RYVOX ADMIN</div>
+        <p style="color:#6b6b80;font-size:0.85rem;margin-bottom:28px;">Enter admin password to continue</p>
+        <input type="password" id="adminPasswordInput" placeholder="Password" onkeydown="if(event.key==='Enter')checkAdminLogin()" style="
+            width:100%;padding:14px 18px;margin-bottom:16px;
+            background:rgba(255,255,255,0.04);border:1px solid rgba(255,255,255,0.09);
+            border-radius:12px;color:#fff;font-size:1rem;font-family:'Outfit',sans-serif;
+            outline:none;transition:border-color 0.3s;
+        " onfocus="this.style.borderColor='rgba(255,45,45,0.5)'" onblur="this.style.borderColor='rgba(255,255,255,0.09)'">
+        <button onclick="checkAdminLogin()" style="
+            width:100%;padding:14px;border:none;border-radius:12px;cursor:pointer;
+            background:linear-gradient(135deg,#ff2d2d,#ff6b35);
+            color:#fff;font-size:1rem;font-weight:700;font-family:'Outfit',sans-serif;
+            box-shadow:0 4px 20px rgba(255,45,45,0.4);transition:all 0.3s;
+        " onmouseover="this.style.transform='translateY(-2px)'" onmouseout="this.style.transform='none'">
+            <i class="fas fa-shield-alt"></i> Enter Admin Panel
+        </button>
+        <div id="loginError" style="color:#ff4d4d;font-size:0.85rem;margin-top:12px;display:none;">
+            <i class="fas fa-exclamation-circle"></i> Incorrect password!
+        </div>
+    </div>
+</div>
+
+<script>
+    // ====== পাসওয়ার্ড এখানে পরিবর্তন করুন ======
+    const ADMIN_PASSWORD = 'ryvox2025';
+    // ============================================
+
+    function checkAdminLogin() {
+        const input = document.getElementById('adminPasswordInput').value;
+        if(input === ADMIN_PASSWORD) {
+            // Generate secure session token for move.html
+            const token = btoa('RYUOX_SECURE_ENTRY_' + Date.now());
+            sessionStorage.setItem('allowed_entry', token);
+            document.getElementById('loginOverlay').style.display='none';
+        } else {
+            document.getElementById('loginError').style.display='block';
+            document.getElementById('adminPasswordInput').value='';
+            document.getElementById('adminPasswordInput').style.borderColor='rgba(255,77,77,0.5)';
+            setTimeout(()=>{
+                document.getElementById('loginError').style.display='none';
+                document.getElementById('adminPasswordInput').style.borderColor='rgba(255,255,255,0.09)';
+            }, 2500);
+        }
+    }
+
+    // View Website বাটনে token সেট করে যান
+    window.goToWebsite = function(){
+        const token = btoa('RYUOX_SECURE_ENTRY_' + Date.now());
+        sessionStorage.setItem('allowed_entry', token);
+        window.location.href = 'move.html';
+    };
+</script>
+
+<!-- Firebase SDKs -->
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.0/firebase-database-compat.js"></script>
+
+<style>
+    :root {
+        --red:#ff2d2d; --red2:#ff6b35; --blue:#4f8ef7; --purple:#a855f7;
+        --green:#22d3a0; --gold:#fbbf24;
+        --dark:#060608; --dark2:#0e0e14; --dark3:#161622;
+        --glass:rgba(255,255,255,0.04); --glass-border:rgba(255,255,255,0.09);
+        --text:#e8e8f0; --muted:#6b6b80;
+    }
+    *{margin:0;padding:0;box-sizing:border-box;}
+    body{
+        background:var(--dark); color:var(--text);
+        font-family:'Outfit',sans-serif; overflow-x:hidden; min-height:100vh;
+        user-select:none; -webkit-user-select:none;
+    }
+    body::before{
+        content:''; position:fixed; inset:0;
+        background:
+            radial-gradient(ellipse 60% 40% at 10% 20%,rgba(255,45,45,0.06) 0%,transparent 70%),
+            radial-gradient(ellipse 50% 50% at 90% 80%,rgba(79,142,247,0.05) 0%,transparent 70%);
+        pointer-events:none; z-index:0;
+    }
+    ::-webkit-scrollbar{width:6px;height:6px;}
+    ::-webkit-scrollbar-track{background:var(--dark2);}
+    ::-webkit-scrollbar-thumb{background:linear-gradient(180deg,var(--red),var(--blue));border-radius:10px;}
+
+    /* NAVBAR */
+    .navbar{
+        display:flex; justify-content:space-between; align-items:center;
+        padding:14px 40px; background:rgba(6,6,8,0.9);
+        backdrop-filter:blur(20px); border-bottom:1px solid var(--glass-border);
+        position:sticky; top:0; z-index:200; box-shadow:0 4px 30px rgba(0,0,0,0.5);
+    }
+    .logo{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;letter-spacing:3px;background:linear-gradient(90deg,#fff 0%,var(--gold) 50%,var(--red2) 100%);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;filter:drop-shadow(0 0 10px rgba(255,170,0,0.4));}
+    .admin-badge{background:linear-gradient(135deg,var(--gold),#f59e0b);color:#000;font-size:0.7rem;font-weight:800;padding:3px 10px;border-radius:50px;letter-spacing:1px;text-transform:uppercase;}
+    .logo-wrap{display:flex;align-items:center;gap:12px;}
+    .nav-link{background:var(--glass);border:1px solid var(--glass-border);color:var(--text);font-size:0.9rem;font-weight:600;cursor:pointer;padding:9px 20px;border-radius:50px;transition:all 0.3s;font-family:'Outfit',sans-serif;text-decoration:none;display:inline-flex;align-items:center;gap:6px;}
+    .nav-link:hover{background:linear-gradient(135deg,var(--blue),var(--purple));border-color:transparent;color:#fff;box-shadow:0 4px 20px rgba(79,142,247,0.4);transform:translateY(-1px);}
+
+    /* LAYOUT */
+    .admin-container{max-width:1400px;margin:0 auto;padding:28px;position:relative;z-index:1;}
+    .admin-header{margin-bottom:28px;}
+    .admin-header h1{font-family:'Bebas Neue',sans-serif;font-size:2.2rem;letter-spacing:3px;background:linear-gradient(90deg,var(--gold),#f59e0b,var(--red2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:6px;}
+    .admin-header p{color:var(--muted);font-size:0.9rem;}
+
+    /* TABS */
+    .admin-tabs{display:flex;gap:10px;margin-bottom:24px;flex-wrap:wrap;}
+    .tab-btn{background:var(--glass);border:1px solid var(--glass-border);color:var(--muted);padding:10px 22px;font-weight:600;cursor:pointer;border-radius:50px;transition:all 0.3s;font-family:'Outfit',sans-serif;font-size:0.9rem;backdrop-filter:blur(10px);display:flex;align-items:center;gap:7px;}
+    .tab-btn:hover{color:#fff;border-color:rgba(255,255,255,0.2);}
+    .tab-btn.active{background:linear-gradient(135deg,var(--red),var(--red2));border-color:transparent;color:#fff;box-shadow:0 4px 16px rgba(255,45,45,0.4);}
+    .tab-content{display:none;}
+    .tab-content.active{display:block;}
+
+    /* CARD */
+    .admin-card{background:var(--glass);border:1px solid var(--glass-border);backdrop-filter:blur(20px);border-radius:20px;padding:28px;margin-bottom:24px;}
+    .card-title{font-family:'Bebas Neue',sans-serif;font-size:1.4rem;letter-spacing:2px;background:linear-gradient(90deg,var(--gold),#f59e0b);-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;margin-bottom:20px;display:flex;align-items:center;gap:10px;}
+    .card-title i{-webkit-text-fill-color:var(--gold);}
+
+    /* FORM */
+    .form-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:14px;}
+    .form-grid-2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+    .form-group{margin-bottom:16px;}
+    .span-2{grid-column:span 2;}
+    .span-3{grid-column:span 3;}
+    .span-4{grid-column:span 4;}
+    label{display:block;margin-bottom:7px;font-weight:500;color:#888;font-size:0.85rem;}
+    input,select,textarea{
+        width:100%;padding:12px 16px;
+        background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);
+        border-radius:10px;color:#fff;font-size:0.95rem;
+        font-family:'Outfit',sans-serif;transition:border-color 0.3s;
+        user-select:text; -webkit-user-select:text;
+    }
+    textarea{resize:vertical;min-height:80px;}
+    input:focus,select:focus,textarea:focus{outline:none;border-color:rgba(255,45,45,0.5);background:rgba(255,255,255,0.06);}
+    input::placeholder,textarea::placeholder{color:#444;}
+    select option{background:#0e0e14;}
+    .btn-primary{background:linear-gradient(135deg,var(--red),var(--red2));border:none;padding:12px 26px;border-radius:50px;font-weight:700;color:#fff;cursor:pointer;font-size:0.95rem;font-family:'Outfit',sans-serif;transition:all 0.3s;box-shadow:0 4px 16px rgba(255,45,45,0.4);display:inline-flex;align-items:center;gap:8px;}
+    .btn-primary:hover{transform:translateY(-2px);box-shadow:0 8px 24px rgba(255,45,45,0.5);}
+    .btn-secondary{background:var(--glass);border:1px solid var(--glass-border);padding:10px 20px;border-radius:50px;font-weight:600;color:var(--muted);cursor:pointer;font-size:0.9rem;font-family:'Outfit',sans-serif;transition:all 0.3s;display:inline-flex;align-items:center;gap:7px;}
+    .btn-secondary:hover{color:#fff;border-color:rgba(255,255,255,0.2);}
+    .btn-success{background:linear-gradient(135deg,var(--green),#16a085);border:none;padding:9px 18px;border-radius:8px;font-weight:600;color:#fff;cursor:pointer;font-size:0.85rem;font-family:'Outfit',sans-serif;transition:all 0.3s;display:inline-flex;align-items:center;gap:6px;}
+    .btn-success:hover{transform:translateY(-1px);box-shadow:0 4px 12px rgba(34,211,160,0.4);}
+    .btn-row{display:flex;gap:12px;flex-wrap:wrap;align-items:center;margin-top:6px;}
+
+    /* SERIES TOGGLE */
+    .series-toggle-row{display:flex;align-items:center;gap:14px;background:rgba(255,255,255,0.03);border:1px solid var(--glass-border);border-radius:12px;padding:14px 18px;margin-bottom:16px;}
+    .toggle-switch{position:relative;width:50px;height:26px;flex-shrink:0;}
+    .toggle-switch input{opacity:0;width:0;height:0;}
+    .toggle-slider{position:absolute;cursor:pointer;inset:0;background:#333;border-radius:26px;transition:0.3s;}
+    .toggle-slider:before{position:absolute;content:'';height:20px;width:20px;left:3px;bottom:3px;background:#fff;border-radius:50%;transition:0.3s;}
+    input:checked+.toggle-slider{background:linear-gradient(135deg,var(--red),var(--red2));}
+    input:checked+.toggle-slider:before{transform:translateX(24px);}
+    .toggle-label{font-weight:600;font-size:0.95rem;}
+    .toggle-label small{display:block;color:var(--muted);font-weight:400;font-size:0.78rem;}
+
+    /* EPISODES MANAGER */
+    .episodes-manager{background:rgba(0,0,0,0.3);border:1px solid var(--glass-border);border-radius:14px;padding:20px;margin-top:16px;display:none;}
+    .episodes-manager.show{display:block;}
+    .ep-form-row{display:grid;grid-template-columns:80px 1fr 100px 1fr auto;gap:10px;align-items:end;margin-bottom:10px;}
+    .ep-list{margin-top:14px;display:flex;flex-direction:column;gap:8px;}
+    .ep-item{background:rgba(255,255,255,0.04);border:1px solid var(--glass-border);border-radius:10px;padding:12px 16px;display:flex;align-items:center;gap:12px;}
+    .ep-item-num{background:linear-gradient(135deg,var(--red),var(--red2));color:#fff;width:30px;height:30px;border-radius:6px;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:0.8rem;flex-shrink:0;}
+    .ep-item-info{flex:1;}
+    .ep-item-title{font-weight:700;font-size:0.9rem;color:#fff;}
+    .ep-item-url{font-size:0.75rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:300px;}
+    .ep-del-btn{background:rgba(255,77,77,0.1);border:1px solid rgba(255,77,77,0.2);color:#ff4d4d;padding:5px 10px;border-radius:6px;cursor:pointer;transition:all 0.2s;font-size:0.8rem;}
+    .ep-del-btn:hover{background:rgba(255,77,77,0.2);}
+    .ep-count-badge{background:rgba(79,142,247,0.15);border:1px solid rgba(79,142,247,0.3);color:var(--blue);padding:4px 12px;border-radius:50px;font-size:0.78rem;font-weight:700;}
+
+    /* MANAGER LAYOUT */
+    .manager-layout{display:grid;grid-template-columns:1fr 1fr;gap:24px;}
+    .list-container{background:rgba(0,0,0,0.3);padding:18px;border-radius:14px;max-height:500px;overflow-y:auto;border:1px solid var(--glass-border);}
+    .list-container h3{font-weight:700;color:#fff;margin-bottom:14px;font-size:1rem;}
+    .admin-movie-item,.admin-brand-item{background:rgba(255,255,255,0.04);padding:12px 16px;border-radius:10px;display:flex;justify-content:space-between;align-items:center;margin-bottom:10px;border-left:3px solid var(--red);transition:all 0.2s;}
+    .admin-movie-item:hover,.admin-brand-item:hover{background:rgba(255,255,255,0.07);}
+    .admin-brand-item{border-left-color:var(--blue);}
+    .admin-item-info{flex:1;}
+    .admin-item-info strong{display:block;font-size:0.9rem;color:#fff;}
+    .admin-item-info small{font-size:0.75rem;color:var(--muted);}
+    .admin-actions{display:flex;gap:8px;}
+    .edit-btn,.delete-btn{background:none;border:none;cursor:pointer;padding:5px 9px;border-radius:6px;transition:all 0.2s;font-size:0.85rem;}
+    .edit-btn{color:var(--gold);} .edit-btn:hover{background:rgba(251,191,36,0.1);}
+    .delete-btn{color:#ff4d4d;} .delete-btn:hover{background:rgba(255,77,77,0.1);}
+
+    /* STATS ROW */
+    .stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:28px;}
+    .stat-card{background:var(--glass);border:1px solid var(--glass-border);border-radius:16px;padding:20px 24px;display:flex;align-items:center;gap:16px;backdrop-filter:blur(20px);}
+    .stat-icon{width:50px;height:50px;border-radius:12px;display:flex;align-items:center;justify-content:center;font-size:1.3rem;flex-shrink:0;}
+    .stat-icon.red{background:rgba(255,45,45,0.15);color:var(--red);}
+    .stat-icon.blue{background:rgba(79,142,247,0.15);color:var(--blue);}
+    .stat-icon.gold{background:rgba(251,191,36,0.15);color:var(--gold);}
+    .stat-icon.green{background:rgba(34,211,160,0.15);color:var(--green);}
+    .stat-num{font-family:'Bebas Neue',sans-serif;font-size:1.8rem;color:#fff;letter-spacing:1px;}
+    .stat-label{font-size:0.78rem;color:var(--muted);font-weight:600;text-transform:uppercase;letter-spacing:1px;}
+
+    /* TOAST */
+    .toast-msg{position:fixed;bottom:28px;right:28px;background:rgba(14,14,20,0.95);border:1px solid var(--glass-border);backdrop-filter:blur(20px);padding:14px 22px;border-radius:12px;z-index:1200;font-weight:600;color:#fff;display:flex;align-items:center;gap:10px;box-shadow:0 10px 30px rgba(0,0,0,0.5);animation:slideInRight 0.35s ease;}
+    @keyframes slideInRight{from{opacity:0;transform:translateX(30px);}to{opacity:1;transform:translateX(0);}}
+    .empty-message{text-align:center;padding:40px 20px;color:var(--muted);font-size:0.9rem;display:flex;flex-direction:column;align-items:center;gap:10px;}
+    .empty-message i{font-size:2rem;opacity:0.4;}
+
+    footer{text-align:center;padding:30px 20px;color:var(--muted);font-size:0.82rem;border-top:1px solid var(--glass-border);margin-top:40px;position:relative;z-index:1;}
+    footer span{background:linear-gradient(90deg,var(--gold),var(--red2));-webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;font-weight:700;}
+
+    @media(max-width:1100px){.stats-row{grid-template-columns:repeat(2,1fr);} .form-grid{grid-template-columns:repeat(2,1fr);}}
+    @media(max-width:768px){
+        .navbar{padding:12px 18px;}
+        .admin-container{padding:16px;}
+        .manager-layout{grid-template-columns:1fr;}
+        .form-grid{grid-template-columns:1fr;}
+        .form-grid-2{grid-template-columns:1fr;}
+        .ep-form-row{grid-template-columns:1fr 1fr;gap:8px;}
+        .stats-row{grid-template-columns:1fr 1fr;}
+        .span-2,.span-3,.span-4{grid-column:span 1;}
+    }
+    @media(max-width:480px){.stats-row{grid-template-columns:1fr 1fr;}}
+</style>
+
+<!-- NAVBAR -->
+<div class="navbar">
+    <div class="logo-wrap">
+        <div class="logo">RYVOX MOVIS</div>
+        <span class="admin-badge"><i class="fas fa-shield-alt"></i> Admin</span>
+    </div>
+    <!-- View Website — token set করে যাবে -->
+    <button class="nav-link" onclick="goToWebsite()">
+        <i class="fas fa-home"></i> View Website
+    </button>
+</div>
+
+<div class="admin-container">
+    <div class="admin-header">
+        <h1><i class="fas fa-cogs" style="-webkit-text-fill-color:var(--gold);font-size:1.6rem;"></i> Admin Control Panel</h1>
+        <p>Manage your movies, series, episodes, and production powerhouses.</p>
+    </div>
+
+    <!-- Stats Row -->
+    <div class="stats-row">
+        <div class="stat-card">
+            <div class="stat-icon red"><i class="fas fa-film"></i></div>
+            <div class="stat-info">
+                <div class="stat-num" id="statMovies">0</div>
+                <div class="stat-label">Total Content</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon blue"><i class="fas fa-tv"></i></div>
+            <div class="stat-info">
+                <div class="stat-num" id="statSeries">0</div>
+                <div class="stat-label">Series</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon gold"><i class="fas fa-play-circle"></i></div>
+            <div class="stat-info">
+                <div class="stat-num" id="statEpisodes">0</div>
+                <div class="stat-label">Episodes</div>
+            </div>
+        </div>
+        <div class="stat-card">
+            <div class="stat-icon green"><i class="fas fa-building"></i></div>
+            <div class="stat-info">
+                <div class="stat-num" id="statBrands">0</div>
+                <div class="stat-label">Powerhouses</div>
+            </div>
+        </div>
+    </div>
+
+    <!-- TABS -->
+    <div class="admin-tabs">
+        <button class="tab-btn active" onclick="switchTab('moviesTab',this)"><i class="fas fa-film"></i> Movies & Series</button>
+        <button class="tab-btn" onclick="switchTab('brandsTab',this)"><i class="fas fa-building"></i> Powerhouses</button>
+    </div>
+
+    <!-- MOVIES TAB -->
+    <div id="moviesTab" class="tab-content active">
+        <div class="manager-layout">
+            <!-- LEFT: Form -->
+            <div>
+                <div class="admin-card">
+                    <div class="card-title"><i class="fas fa-video"></i> <span id="formCardTitle">Add New Content</span></div>
+
+                    <div class="form-grid">
+                        <div class="form-group span-2">
+                            <label>Content Title *</label>
+                            <input type="text" id="movieTitle" placeholder="e.g., Breaking Bad" autocomplete="off">
+                        </div>
+                        <div class="form-group">
+                            <label>Content Type</label>
+                            <select id="movieType" onchange="onTypeChange()">
+                                <option value="Movie">🎬 Movie</option>
+                                <option value="Series">📺 Series</option>
+                                <option value="Drama">🎭 Drama</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Powerhouse</label>
+                            <select id="moviePowerhouse">
+                                <option value="">-- None --</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label>Release Year</label>
+                            <input type="text" id="releaseYear" placeholder="2024">
+                        </div>
+                        <div class="form-group">
+                            <label>Rating (/ 10)</label>
+                            <input type="text" id="movieRating" placeholder="8.5">
+                        </div>
+                        <div class="form-group">
+                            <label>Duration</label>
+                            <input type="text" id="movieDuration" placeholder="2h 15m or Ongoing">
+                        </div>
+                        <div class="form-group">
+                            <label>Poster Image URL</label>
+                            <input type="text" id="imageUrl" placeholder="https://...poster.jpg">
+                        </div>
+                    </div>
+
+                    <!-- Series Toggle -->
+                    <div class="series-toggle-row" id="seriesToggleRow" style="display:none;">
+                        <label class="toggle-switch">
+                            <input type="checkbox" id="isSeriesToggle" onchange="onSeriesToggle()">
+                            <span class="toggle-slider"></span>
+                        </label>
+                        <div class="toggle-label">
+                            Has Episodes
+                            <small>Turn on to add multiple episode links</small>
+                        </div>
+                        <span class="ep-count-badge" id="epCountBadge" style="display:none;">0 Episodes</span>
+                    </div>
+
+                    <!-- Single Video URL (Movie) -->
+                    <div id="singleVideoField" class="form-group">
+                        <label>Video URL <span style="color:var(--muted);font-weight:400;">(YouTube, MP4, MKV, AVI, play.io, etc.)</span></label>
+                        <input type="text" id="videoUrl" placeholder="https://example.com/video.mp4  or  https://youtu.be/...">
+                    </div>
+
+                    <!-- ===== EPISODES MANAGER — কার্যকরী ===== -->
+                    <div class="episodes-manager" id="episodesManager">
+                        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+                            <h4 style="color:#fff;font-size:0.95rem;font-weight:700;">
+                                <i class="fas fa-list" style="color:var(--red);margin-right:8px;"></i>Episode List
+                            </h4>
+                            <span class="ep-count-badge" id="epCountInManager">0 Episodes</span>
+                        </div>
+
+                        <!-- Add Episode Form -->
+                        <div style="background:rgba(0,0,0,0.3);border-radius:12px;padding:16px;margin-bottom:14px;border:1px solid var(--glass-border);">
+                            <p style="color:var(--muted);font-size:0.82rem;margin-bottom:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;">
+                                <i class="fas fa-plus-circle" style="color:var(--green);"></i> Add New Episode
+                            </p>
+                            <div style="display:grid;grid-template-columns:90px 1fr 110px;gap:10px;margin-bottom:10px;">
+                                <div class="form-group" style="margin:0;">
+                                    <label>Ep No. *</label>
+                                    <input type="number" id="epNumber" placeholder="1" min="1">
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label>Episode Title</label>
+                                    <input type="text" id="epTitle" placeholder="e.g., Pilot">
+                                </div>
+                                <div class="form-group" style="margin:0;">
+                                    <label>Duration</label>
+                                    <input type="text" id="epDuration" placeholder="45m">
+                                </div>
+                            </div>
+                            <div class="form-group" style="margin-bottom:12px;">
+                                <label>Video URL * <span style="color:var(--muted);font-weight:400;">(MP4, MKV, AVI, YouTube, play.io, etc.)</span></label>
+                                <input type="text" id="epVideoUrl" placeholder="https://example.com/episode1.mkv">
+                            </div>
+                            <button class="btn-success" onclick="addEpisodeToList()">
+                                <i class="fas fa-plus"></i> Add Episode
+                            </button>
+                        </div>
+
+                        <!-- Episode List Preview -->
+                        <div class="ep-list" id="epListPreview">
+                            <p style="color:var(--muted);font-size:0.85rem;text-align:center;padding:10px 0;">No episodes added yet.</p>
+                        </div>
+                    </div>
+
+                    <div class="btn-row" style="margin-top:20px;">
+                        <button class="btn-primary" id="saveMovieBtn" onclick="saveMovie()"><i class="fas fa-save"></i> Save Content</button>
+                        <button class="btn-secondary" onclick="resetMovieForm()"><i class="fas fa-times"></i> Reset</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- RIGHT: List -->
+            <div>
+                <div class="admin-card" style="padding:20px;">
+                    <div class="card-title"><i class="fas fa-database"></i> Published Content</div>
+                    <div class="list-container" style="max-height:560px;">
+                        <div id="adminMovieList">
+                            <div class="empty-message"><i class="fas fa-film"></i> Loading...</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- BRANDS TAB -->
+    <div id="brandsTab" class="tab-content">
+        <div class="manager-layout">
+            <div>
+                <div class="admin-card">
+                    <div class="card-title"><i class="fas fa-building"></i> <span id="brandCardTitle">Add Powerhouse</span></div>
+                    <div class="form-group">
+                        <label>Brand / Studio Name *</label>
+                        <input type="text" id="brandName" placeholder="e.g., Marvel Studios" autocomplete="off">
+                    </div>
+                    <div class="form-group">
+                        <label>Brand Logo URL <span style="color:var(--muted);font-weight:400;">(Optional)</span></label>
+                        <input type="text" id="brandLogoUrl" placeholder="https://...logo.png">
+                    </div>
+                    <div class="btn-row">
+                        <button class="btn-primary" id="saveBrandBtn" onclick="saveBrand()"><i class="fas fa-save"></i> Save Powerhouse</button>
+                        <button class="btn-secondary" onclick="resetBrandForm()"><i class="fas fa-times"></i> Reset</button>
+                    </div>
+                </div>
+            </div>
+            <div>
+                <div class="admin-card" style="padding:20px;">
+                    <div class="card-title"><i class="fas fa-th-list"></i> Existing Brands</div>
+                    <div class="list-container">
+                        <div id="adminBrandList">
+                            <div class="empty-message"><i class="fas fa-building"></i> No brands yet.</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<footer>© <span>RYVOX MOVIS</span> Admin Panel — Manage Your Streaming Empire</footer>
+
+<script>
+    const firebaseConfig = {
+        apiKey: "AIzaSyAIJraOv5TlJ2wEyoYvZrhg6-xAgu-0bAM",
+        authDomain: "server-64c14.firebaseapp.com",
+        databaseURL: "https://server-64c14-default-rtdb.firebaseio.com",
+        projectId: "server-64c14",
+        storageBucket: "server-64c14.firebasestorage.app",
+        messagingSenderId: "297385923327",
+        appId: "1:297385923327:web:7743f6b55310a93ae4b2ca"
+    };
+    if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
+    const database = firebase.database();
+    const moviesRef = database.ref('movies');
+    const brandsRef = database.ref('brands');
+
+    let allMovies=[], allBrands=[];
+    let editKey=null, editBrandKey=null;
+    let tempEpisodes=[];
+
+    function escapeHtml(str){
+        if(!str) return '';
+        return String(str).replace(/[&<>'"]/g,m=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[m]));
+    }
+    function showToast(msg,isError=false){
+        const t=document.createElement('div'); t.className='toast-msg';
+        t.style.borderLeft=`4px solid ${isError?'#ff4d4d':'#22d3a0'}`;
+        t.innerHTML=`<i class="fas ${isError?'fa-exclamation-triangle':'fa-check-circle'}" style="color:${isError?'#ff4d4d':'#22d3a0'}"></i> ${msg}`;
+        document.body.appendChild(t);
+        setTimeout(()=>{t.style.opacity='0';t.style.transform='translateX(30px)';setTimeout(()=>t.remove(),400);},2800);
+    }
+
+    function switchTab(id,btn){
+        document.querySelectorAll('.tab-content').forEach(t=>t.classList.remove('active'));
+        document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+        document.getElementById(id).classList.add('active');
+        btn.classList.add('active');
+    }
+
+    function onTypeChange(){
+        const type=document.getElementById('movieType').value;
+        const isSeriesType=(type==='Series'||type==='Drama');
+        document.getElementById('seriesToggleRow').style.display=isSeriesType?'flex':'none';
+        if(!isSeriesType){
+            document.getElementById('isSeriesToggle').checked=false;
+            document.getElementById('episodesManager').classList.remove('show');
+            document.getElementById('singleVideoField').style.display='block';
+        }
+    }
+
+    function onSeriesToggle(){
+        const on=document.getElementById('isSeriesToggle').checked;
+        document.getElementById('episodesManager').classList.toggle('show',on);
+        document.getElementById('singleVideoField').style.display=on?'none':'block';
+        updateEpCountBadge();
+    }
+
+    // ===== EPISODES MANAGER — কার্যকরী =====
+    function addEpisodeToList(){
+        const epNum=document.getElementById('epNumber').value.trim();
+        const epTitle=document.getElementById('epTitle').value.trim();
+        const epDuration=document.getElementById('epDuration').value.trim();
+        const epVideoUrl=document.getElementById('epVideoUrl').value.trim();
+        if(!epVideoUrl){ showToast('Episode Video URL দিতে হবে!',true); return; }
+        if(!epNum){ showToast('Episode নম্বর দিতে হবে!',true); return; }
+
+        // Check duplicate episode number
+        if(tempEpisodes.find(e=>String(e.epNumber)===String(epNum))){
+            showToast(`Episode ${epNum} আগে থেকেই আছে!`,true); return;
+        }
+
+        const ep={
+            epNumber: epNum,
+            epTitle: epTitle || `Episode ${epNum}`,
+            epDuration: epDuration || '',
+            videoUrl: epVideoUrl
+        };
+        tempEpisodes.push(ep);
+        // Sort by episode number
+        tempEpisodes.sort((a,b)=>Number(a.epNumber)-Number(b.epNumber));
+
+        // Clear fields
+        document.getElementById('epNumber').value='';
+        document.getElementById('epTitle').value='';
+        document.getElementById('epDuration').value='';
+        document.getElementById('epVideoUrl').value='';
+
+        renderEpListPreview();
+        updateEpCountBadge();
+        showToast(`Episode ${ep.epNumber}: "${ep.epTitle}" যোগ হয়েছে! ✅`);
+    }
+
+    function removeEpisode(i){
+        const ep = tempEpisodes[i];
+        tempEpisodes.splice(i,1);
+        renderEpListPreview();
+        updateEpCountBadge();
+        showToast(`Episode ${ep.epNumber} মুছে ফেলা হয়েছে`);
+    }
+
+    function renderEpListPreview(){
+        const container=document.getElementById('epListPreview');
+        if(!tempEpisodes.length){
+            container.innerHTML='<p style="color:var(--muted);font-size:0.85rem;text-align:center;padding:10px 0;">No episodes added yet.</p>';
+            return;
+        }
+        container.innerHTML=tempEpisodes.map((ep,i)=>`
+            <div class="ep-item">
+                <div class="ep-item-num">${escapeHtml(ep.epNumber)}</div>
+                <div class="ep-item-info">
+                    <div class="ep-item-title">${escapeHtml(ep.epTitle)}</div>
+                    <div class="ep-item-url" title="${escapeHtml(ep.videoUrl)}">${escapeHtml(ep.videoUrl)}</div>
+                </div>
+                <span style="color:var(--muted);font-size:0.78rem;flex-shrink:0;">${escapeHtml(ep.epDuration)}</span>
+                <button class="ep-del-btn" onclick="removeEpisode(${i})" title="Delete episode">
+                    <i class="fas fa-trash"></i>
+                </button>
+            </div>
+        `).join('');
+    }
+
+    function updateEpCountBadge(){
+        const count=tempEpisodes.length;
+        const badge1 = document.getElementById('epCountBadge');
+        const badge2 = document.getElementById('epCountInManager');
+        const txt = `${count} Episode${count!==1?'s':''}`;
+        badge1.style.display=count>0?'inline-block':'none';
+        badge1.textContent=txt;
+        badge2.textContent=txt;
+    }
+
+    // DATA SYNC
+    moviesRef.on('value',snapshot=>{
+        const data=snapshot.val();
+        allMovies=data?Object.entries(data).map(([key,val])=>({
+            id:key, title:val.title||'Untitled', imageUrl:val.imageUrl||'',
+            videoUrl:val.videoUrl||'', year:val.year||'N/A', rating:val.rating||'7.5',
+            duration:val.duration||'N/A', type:val.type||'Movie',
+            powerhouse:val.powerhouse||'', isSeries:val.isSeries||false,
+            episodes:val.episodes||null
+        })).reverse():[];
+        renderAdminList();
+        updateStats();
+    });
+
+    brandsRef.on('value',snapshot=>{
+        const data=snapshot.val();
+        allBrands=data?Object.entries(data).map(([key,val])=>({id:key,name:val.name||'Brand',logoUrl:val.logoUrl||''})):[];
+        renderAdminBrandsList();
+        updatePowerhouseDropdown();
+        updateStats();
+    });
+
+    function updateStats(){
+        document.getElementById('statMovies').textContent=allMovies.length;
+        const seriesCount=allMovies.filter(m=>m.isSeries||m.type==='Series'||m.type==='Drama').length;
+        document.getElementById('statSeries').textContent=seriesCount;
+        let totalEps=0;
+        allMovies.forEach(m=>{ if(m.episodes) totalEps+=Object.keys(m.episodes).length; });
+        document.getElementById('statEpisodes').textContent=totalEps;
+        document.getElementById('statBrands').textContent=allBrands.length;
+    }
+
+    // SAVE MOVIE
+    function saveMovie(){
+        const title=document.getElementById('movieTitle').value.trim();
+        const videoUrl=document.getElementById('videoUrl').value.trim();
+        const isSeries=document.getElementById('isSeriesToggle').checked;
+        if(!title){ showToast('Title দিতে হবে!',true); return; }
+        if(!isSeries&&!videoUrl){ showToast('Video URL দিতে হবে!',true); return; }
+        if(isSeries&&tempEpisodes.length===0){ showToast('কমপক্ষে একটি Episode যোগ করুন!',true); return; }
+
+        const movieData={
+            title,
+            imageUrl:document.getElementById('imageUrl').value.trim(),
+            videoUrl:isSeries?'':videoUrl,
+            year:document.getElementById('releaseYear').value.trim()||'2025',
+            rating:document.getElementById('movieRating').value.trim()||'7.5',
+            duration:document.getElementById('movieDuration').value.trim()||'N/A',
+            type:document.getElementById('movieType').value,
+            powerhouse:document.getElementById('moviePowerhouse').value,
+            isSeries:isSeries
+        };
+
+        if(isSeries){
+            movieData.episodes={};
+            tempEpisodes.forEach((ep,i)=>{
+                movieData.episodes[`ep_${String(ep.epNumber).padStart(3,'0')}`]=ep;
+            });
+        }
+
+        const saveBtn=document.getElementById('saveMovieBtn');
+        saveBtn.disabled=true; saveBtn.innerHTML='<i class="fas fa-spinner fa-spin"></i> Saving...';
+
+        const action = editKey
+            ? moviesRef.child(editKey).update(movieData)
+            : moviesRef.push(movieData);
+
+        action.then(()=>{
+            showToast(editKey?`"${title}" আপডেট হয়েছে! ✅`:`"${title}" প্রকাশিত হয়েছে! 🎬`);
+            resetMovieForm();
+        }).catch(e=>showToast('Error: '+e.message,true))
+        .finally(()=>{ saveBtn.disabled=false; saveBtn.innerHTML='<i class="fas fa-save"></i> Save Content'; });
+    }
+
+    function resetMovieForm(){
+        ['movieTitle','imageUrl','videoUrl','releaseYear','movieRating','movieDuration'].forEach(id=>document.getElementById(id).value='');
+        document.getElementById('movieType').value='Movie';
+        document.getElementById('moviePowerhouse').value='';
+        document.getElementById('isSeriesToggle').checked=false;
+        document.getElementById('episodesManager').classList.remove('show');
+        document.getElementById('singleVideoField').style.display='block';
+        document.getElementById('seriesToggleRow').style.display='none';
+        document.getElementById('formCardTitle').textContent='Add New Content';
+        document.getElementById('saveMovieBtn').innerHTML='<i class="fas fa-save"></i> Save Content';
+        tempEpisodes=[];
+        renderEpListPreview();
+        updateEpCountBadge();
+        editKey=null;
+    }
+
+    function renderAdminList(){
+        const container=document.getElementById('adminMovieList');
+        if(!allMovies.length){container.innerHTML=`<div class="empty-message"><i class="fas fa-inbox"></i> No content yet.</div>`;return;}
+        container.innerHTML=allMovies.map(movie=>{
+            const epCount=movie.episodes?Object.keys(movie.episodes).length:0;
+            const epTag=movie.isSeries&&epCount?`<span style="background:rgba(79,142,247,0.15);color:var(--blue);font-size:0.7rem;padding:1px 7px;border-radius:4px;margin-left:6px;">${epCount} Eps</span>`:'';
+            return `<div class="admin-movie-item">
+                <div class="admin-item-info">
+                    <strong>${escapeHtml(movie.title)}${epTag}</strong>
+                    <small>${escapeHtml(movie.year)} • ${escapeHtml(movie.type)} • ⭐ ${escapeHtml(movie.rating)}</small>
+                </div>
+                <div class="admin-actions">
+                    <button class="edit-btn" onclick="editMovie('${movie.id}')" title="Edit"><i class="fas fa-edit"></i></button>
+                    <button class="delete-btn" onclick="deleteMovie('${movie.id}')" title="Delete"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            </div>`;
+        }).join('');
+    }
+
+    window.editMovie=function(key){
+        const movie=allMovies.find(m=>m.id===key);
+        if(!movie) return;
+        document.getElementById('movieTitle').value=movie.title;
+        document.getElementById('imageUrl').value=movie.imageUrl;
+        document.getElementById('videoUrl').value=movie.videoUrl;
+        document.getElementById('releaseYear').value=movie.year;
+        document.getElementById('movieRating').value=movie.rating;
+        document.getElementById('movieDuration').value=movie.duration;
+        document.getElementById('movieType').value=movie.type;
+        document.getElementById('moviePowerhouse').value=movie.powerhouse||'';
+        onTypeChange();
+        document.getElementById('isSeriesToggle').checked=movie.isSeries;
+        onSeriesToggle();
+        tempEpisodes=[];
+        if(movie.episodes){
+            tempEpisodes=Object.values(movie.episodes).sort((a,b)=>Number(a.epNumber)-Number(b.epNumber));
+        }
+        renderEpListPreview();
+        updateEpCountBadge();
+        editKey=key;
+        document.getElementById('formCardTitle').textContent='Edit Content';
+        document.getElementById('saveMovieBtn').innerHTML='<i class="fas fa-sync-alt"></i> Update Content';
+        document.getElementById('moviesTab').scrollIntoView({behavior:'smooth'});
+        showToast(`Editing: ${movie.title} ✏️`);
+    };
+
+    window.deleteMovie=function(key){
+        if(confirm('এই content স্থায়ীভাবে মুছে ফেলবেন? এটি ফেরানো যাবে না।')){
+            moviesRef.child(key).remove().then(()=>showToast('মুছে ফেলা হয়েছে!')).catch(e=>showToast('Error: '+e.message,true));
+        }
+    };
+
+    // BRANDS
+    function saveBrand(){
+        const name=document.getElementById('brandName').value.trim();
+        if(!name){ showToast('Brand name দিতে হবে!',true); return; }
+        const brandData={name,logoUrl:document.getElementById('brandLogoUrl').value.trim()};
+        const action=editBrandKey?brandsRef.child(editBrandKey).update(brandData):brandsRef.push(brandData);
+        action.then(()=>{ showToast(editBrandKey?`"${name}" আপডেট! ✅`:`"${name}" যোগ হয়েছে! 🏢`); resetBrandForm(); }).catch(e=>showToast('Error: '+e.message,true));
+    }
+    function resetBrandForm(){
+        document.getElementById('brandName').value='';
+        document.getElementById('brandLogoUrl').value='';
+        document.getElementById('brandCardTitle').textContent='Add Powerhouse';
+        document.getElementById('saveBrandBtn').innerHTML='<i class="fas fa-save"></i> Save Powerhouse';
+        editBrandKey=null;
+    }
+    function renderAdminBrandsList(){
+        const container=document.getElementById('adminBrandList');
+        if(!allBrands.length){container.innerHTML=`<div class="empty-message"><i class="fas fa-building"></i> No brands yet.</div>`;return;}
+        container.innerHTML=allBrands.map(brand=>`
+            <div class="admin-brand-item">
+                <div class="admin-item-info">
+                    <strong>${escapeHtml(brand.name)}</strong>
+                    <small>${brand.logoUrl?'Has logo':'No logo'}</small>
+                </div>
+                <div class="admin-actions">
+                    <button class="edit-btn" onclick="editBrand('${brand.id}')"><i class="fas fa-edit"></i></button>
+                    <button class="delete-btn" onclick="deleteBrand('${brand.id}')"><i class="fas fa-trash-alt"></i></button>
+                </div>
+            </div>
+        `).join('');
+    }
+    window.editBrand=function(key){
+        const brand=allBrands.find(b=>b.id===key);
+        if(!brand) return;
+        document.getElementById('brandName').value=brand.name;
+        document.getElementById('brandLogoUrl').value=brand.logoUrl||'';
+        editBrandKey=key;
+        document.getElementById('brandCardTitle').textContent='Edit Powerhouse';
+        document.getElementById('saveBrandBtn').innerHTML='<i class="fas fa-sync-alt"></i> Update Powerhouse';
+        showToast(`Editing: ${brand.name} ✏️`);
+    };
+    window.deleteBrand=function(key){
+        if(confirm('এই Powerhouse মুছে ফেলবেন?')){
+            brandsRef.child(key).remove().then(()=>showToast('Brand মুছে ফেলা হয়েছে!')).catch(e=>showToast('Error: '+e.message,true));
+        }
+    };
+    function updatePowerhouseDropdown(){
+        let opts='<option value="">-- None --</option>';
+        allBrands.forEach(b=>{ opts+=`<option value="${escapeHtml(b.name)}">${escapeHtml(b.name)}</option>`; });
+        document.getElementById('moviePowerhouse').innerHTML=opts;
+    }
+</script>
+</body>
+</html>
