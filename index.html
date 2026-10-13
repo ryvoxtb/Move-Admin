@@ -488,14 +488,14 @@
 
 <script>
     const firebaseConfig = {
-        apiKey: "AIzaSyAIJraOv5TlJ2wEyoYvZrhg6-xAgu-0bAM",
-        authDomain: "server-64c14.firebaseapp.com",
-        databaseURL: "https://server-64c14-default-rtdb.firebaseio.com",
-        projectId: "server-64c14",
-        storageBucket: "server-64c14.firebasestorage.app",
-        messagingSenderId: "297385923327",
-        appId: "1:297385923327:web:7743f6b55310a93ae4b2ca"
-    };
+      apiKey: "AIzaSyAIJraOv5TlJ2wEyoYvZrhg6-xAgu-0bAM",
+      authDomain: "server-64c14.firebaseapp.com",
+      databaseURL: "https://server-64c14-default-rtdb.firebaseio.com",
+      projectId: "server-64c14",
+      storageBucket: "server-64c14.firebasestorage.app",
+      messagingSenderId: "297385923327",
+      appId: "1:297385923327:web:7743f6b55310a93ae4b2ca"
+};
     if(!firebase.apps.length) firebase.initializeApp(firebaseConfig);
     const database = firebase.database();
     const moviesRef = database.ref('movies');
